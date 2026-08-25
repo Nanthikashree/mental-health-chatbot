@@ -4,6 +4,7 @@ from models.checkin_model import CheckIn
 from models.mood_prediction_model import MoodPrediction
 from models.mood_features import compute_all_features
 from models.bayesian_mood_model import predict_mood
+from utils.safety_layer import check_for_distress, get_safety_response
 
 checkin_bp = Blueprint('checkin', __name__)
 
@@ -24,6 +25,8 @@ def submit_checkin():
         if field not in data:
             return jsonify({"error": f"Missing field: {field}"}), 400
 
+    free_text = data.get('free_text')
+
     new_checkin = CheckIn(
         user_id=session['user_id'],
         sleep_quality=data['sleep_quality'],
@@ -37,16 +40,24 @@ def submit_checkin():
         overall_mood=data['overall_mood'],
         felt_motivated=data['felt_motivated'],
         enjoyed_something=data['enjoyed_something'],
-        free_text=data.get('free_text')
+        free_text=free_text
     )
 
     db.session.add(new_checkin)
-    db.session.commit()  # commit first so new_checkin.id is generated
+    db.session.commit()
 
-    # Compute composite features from the raw check-in
+    # SAFETY CHECK FIRST - runs independently of mood prediction
+    if check_for_distress(free_text):
+        safety_response = get_safety_response()
+        return jsonify({
+            "message": "Check-in submitted successfully",
+            "checkin_id": new_checkin.id,
+            "safety_alert": safety_response
+        }), 201
+
+    # Normal flow - only runs if safety check did NOT trigger
     features = compute_all_features(new_checkin)
 
-    # Run the Bayesian Network to get mood probabilities
     mood_probs = predict_mood(
         features['physical_wellbeing'],
         features['social_connection'],
@@ -54,7 +65,6 @@ def submit_checkin():
         features['positive_engagement']
     )
 
-    # Store the prediction linked to this check-in
     new_prediction = MoodPrediction(
         checkin_id=new_checkin.id,
         user_id=session['user_id'],
