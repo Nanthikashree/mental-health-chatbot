@@ -1,6 +1,9 @@
 from flask import Blueprint, request, jsonify, session
 from models.user_model import db
 from models.checkin_model import CheckIn
+from models.mood_prediction_model import MoodPrediction
+from models.mood_features import compute_all_features
+from models.bayesian_mood_model import predict_mood
 
 checkin_bp = Blueprint('checkin', __name__)
 
@@ -34,13 +37,44 @@ def submit_checkin():
         overall_mood=data['overall_mood'],
         felt_motivated=data['felt_motivated'],
         enjoyed_something=data['enjoyed_something'],
-        free_text=data.get('free_text')  # optional, so use .get()
+        free_text=data.get('free_text')
     )
 
     db.session.add(new_checkin)
+    db.session.commit()  # commit first so new_checkin.id is generated
+
+    # Compute composite features from the raw check-in
+    features = compute_all_features(new_checkin)
+
+    # Run the Bayesian Network to get mood probabilities
+    mood_probs = predict_mood(
+        features['physical_wellbeing'],
+        features['social_connection'],
+        features['stress_load'],
+        features['positive_engagement']
+    )
+
+    # Store the prediction linked to this check-in
+    new_prediction = MoodPrediction(
+        checkin_id=new_checkin.id,
+        user_id=session['user_id'],
+        physical_wellbeing=features['physical_wellbeing'],
+        social_connection=features['social_connection'],
+        stress_load=features['stress_load'],
+        positive_engagement=features['positive_engagement'],
+        mood_negative=mood_probs['Negative'],
+        mood_neutral=mood_probs['Neutral'],
+        mood_positive=mood_probs['Positive']
+    )
+
+    db.session.add(new_prediction)
     db.session.commit()
 
-    return jsonify({"message": "Check-in submitted successfully", "checkin_id": new_checkin.id}), 201
+    return jsonify({
+        "message": "Check-in submitted successfully",
+        "checkin_id": new_checkin.id,
+        "mood_prediction": mood_probs
+    }), 201
 
 
 @checkin_bp.route('/history', methods=['GET'])
