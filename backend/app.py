@@ -4,6 +4,7 @@ from models.user_model import db
 from models.checkin_model import CheckIn
 from auth import auth_bp
 from routes.checkin_routes import checkin_bp
+from models.mood_prediction_model import MoodPrediction
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
