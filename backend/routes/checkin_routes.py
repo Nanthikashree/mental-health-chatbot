@@ -6,6 +6,7 @@ from models.mood_features import compute_all_features
 from models.bayesian_mood_model import predict_mood
 from utils.safety_layer import check_for_distress, get_safety_response
 from models.trend_model import detect_trend, mood_prediction_to_score
+from utils.response_bank import get_daily_message, get_trend_message
 
 checkin_bp = Blueprint('checkin', __name__)
 
@@ -79,10 +80,13 @@ def submit_checkin():
     db.session.add(new_prediction)
     db.session.commit()
 
+    daily_message = get_daily_message(mood_probs)
+
     return jsonify({
         "message": "Check-in submitted successfully",
         "checkin_id": new_checkin.id,
-        "mood_prediction": mood_probs
+        "mood_prediction": mood_probs,
+        "daily_message": daily_message
     }), 201
 
 
@@ -118,7 +122,8 @@ def get_trend():
     if not predictions:
         return jsonify({
             "trend": "No check-ins yet",
-            "checkins_so_far": 0
+            "checkins_so_far": 0,
+            "trend_message": get_trend_message({"trend": "No check-ins yet"})
         }), 200
 
     mood_scores = [
@@ -127,5 +132,6 @@ def get_trend():
     ]
 
     result = detect_trend(mood_scores)
+    result["trend_message"] = get_trend_message(result)
 
     return jsonify(result), 200
