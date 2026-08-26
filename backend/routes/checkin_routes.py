@@ -5,6 +5,7 @@ from models.mood_prediction_model import MoodPrediction
 from models.mood_features import compute_all_features
 from models.bayesian_mood_model import predict_mood
 from utils.safety_layer import check_for_distress, get_safety_response
+from models.trend_model import detect_trend, mood_prediction_to_score
 
 checkin_bp = Blueprint('checkin', __name__)
 
@@ -46,7 +47,6 @@ def submit_checkin():
     db.session.add(new_checkin)
     db.session.commit()
 
-    # SAFETY CHECK FIRST - runs independently of mood prediction
     if check_for_distress(free_text):
         safety_response = get_safety_response()
         return jsonify({
@@ -55,7 +55,6 @@ def submit_checkin():
             "safety_alert": safety_response
         }), 201
 
-    # Normal flow - only runs if safety check did NOT trigger
     features = compute_all_features(new_checkin)
 
     mood_probs = predict_mood(
@@ -103,5 +102,30 @@ def get_history():
         "stress_level": c.stress_level,
         "free_text": c.free_text
     } for c in checkins]
+
+    return jsonify(result), 200
+
+
+@checkin_bp.route('/trend', methods=['GET'])
+def get_trend():
+    if 'user_id' not in session:
+        return jsonify({"error": "Not logged in"}), 401
+
+    predictions = MoodPrediction.query.filter_by(
+        user_id=session['user_id']
+    ).order_by(MoodPrediction.timestamp.asc()).all()
+
+    if not predictions:
+        return jsonify({
+            "trend": "No check-ins yet",
+            "checkins_so_far": 0
+        }), 200
+
+    mood_scores = [
+        mood_prediction_to_score(p.mood_negative, p.mood_neutral, p.mood_positive)
+        for p in predictions
+    ]
+
+    result = detect_trend(mood_scores)
 
     return jsonify(result), 200
