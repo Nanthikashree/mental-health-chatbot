@@ -1,122 +1,92 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState } from 'react';
+import './App.css';
+import CheckIn from './CheckIn';
+import History from './History';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [isLogin, setIsLogin] = useState(true);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [view, setView] = useState('checkin'); // 'checkin' or 'history'
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage('');
+
+    const endpoint = isLogin ? 'login' : 'signup';
+
+    try {
+      const response = await fetch(`http://localhost:5000/api/auth/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        if (isLogin) {
+          setLoggedIn(true);
+        } else {
+          setMessage('Account created — you can now log in.');
+          setIsLogin(true);
+        }
+      } else {
+        setMessage(data.error || 'Something went wrong.');
+      }
+    } catch (err) {
+      setMessage('Could not connect to the server. Is the backend running?');
+    }
+  };
+
+  if (loggedIn) {
+    return view === 'history' ? (
+      <History onBack={() => setView('checkin')} />
+    ) : (
+      <CheckIn onViewHistory={() => setView('history')} />
+    );
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="app-container">
+      <div className="auth-card">
+        <h1 className="app-title">Mood Check-In</h1>
+        <p className="app-subtitle">
+          {isLogin ? 'Welcome back — log in to continue' : 'Create an account to get started'}
+        </p>
 
-      <div className="ticks"></div>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <button type="submit">{isLogin ? 'Log In' : 'Sign Up'}</button>
+        </form>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        {message && <p className="auth-message">{message}</p>}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        <p className="toggle-text">
+          {isLogin ? "Don't have an account? " : 'Already have an account? '}
+          <span className="toggle-link" onClick={() => { setIsLogin(!isLogin); setMessage(''); }}>
+            {isLogin ? 'Sign up' : 'Log in'}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
 }
 
-export default App
+export default App;

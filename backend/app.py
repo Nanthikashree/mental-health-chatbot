@@ -7,11 +7,13 @@ from routes.checkin_routes import checkin_bp
 from models.mood_prediction_model import MoodPrediction
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins=["http://localhost:5173"])
 
 app.config['SECRET_KEY'] = 'dev-secret-key-change-this-later'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///mood_tracker.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
 
 db.init_app(app)
 
